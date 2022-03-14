@@ -19,7 +19,7 @@ hy = Lsqy/Ne;
 Re = 0.01;
 
 % simulation temporal parameters
-dt = 0.02*hx;            % time step size
+dt = 0.2*hx;            % time step size
 Nt = round(10/dt);       % number of time steps
 
 % Lagrangian parameters
@@ -31,7 +31,7 @@ Ka     = 185;           % area conservation constant
 Kp = 0;                 % porous slip parameter
 KT = 3200;              % tether force
 NT = 2*Ne;
-dthetaT = Lsq/NT;
+dthetaT = Lsqx/NT;
 lIdx   = (0:(NT-1))';
 
 % construct Eulerian mesh
@@ -55,16 +55,13 @@ w = 0.5/6/2;
 d = 0.5/6/1.3;
 Tl1     = [(lIdx*dthetaT) w*sin(a*lIdx*dthetaT)+d];
 Tl2     = [(lIdx*dthetaT) (1-(w*sin(a*lIdx*dthetaT)+d))];
-% initial IB points (ESL) that are connected to the tether points
-XTl10   = Tl1;                                
-XTl20   = Tl2;
 
 % biconcave shape of the RBC
 Nl = Ne*2;
 dtheta = 2*pi/Nl;
 lIdx = (0:(Nl-1))';
 r   = 2.8;
-alpha = 1.38581894;
+alpha = 0.554327576;
 xi = lIdx*dtheta-pi/2;
 
 Xl0 = [(r*0.5*alpha*(0.207+2.003*sin(xi).*sin(xi)-1.123*sin(xi).^4).*cos(xi)) (r*alpha*sin(xi))];
@@ -73,13 +70,13 @@ Xl0 = Xl0./LD;
 % 30 degree initial orientation
 [theta,r] = cart2pol(Xl0(:,1), Xl0(:,2));
 theta = theta+atan(-tan(pi/3));
-[xr,yr]=pol2cart(theta,r);
+[xr,yr] = pol2cart(theta,r);
 Xl0(:,1) = xr;
 Xl0(:,2) = yr;
 
 % shift the position of the RBC
-Xl0(:,2) = Xl0(:,2) + abs(c-min(Xl0(:,2))) + 2.5*hy;
-Xl0(:,1) = Xl0(:,1) + Tl1(idx1(1),1) + dic*(ic-1);
+Xl0(:,2) = Xl0(:,2) + abs((w+d)-min(Xl0(:,2))) + 2.5*hy;
+Xl0(:,1) = Xl0(:,1) + pi/(2*LD);
 
 dXl0 = 0;
 for(q = 1:Nl-1)
@@ -104,9 +101,11 @@ p  = zeros(Ne*Ne,Nt+1);
 ph = p(:,1);
 
 % Lagrangian points:
-Xlx(:,1) = Xl0(:,1);
-Xly(:,1) = Xl0(:,2);
-Xl       = Xl0;
+XTl10   = Tl1;                                
+XTl20   = Tl2;
+XTl1    = XTl10;
+XTl2    = XTl20;
+Xl      = Xl0;
 FT1 = zeros(NT,2);
 FT2 = zeros(NT,2);
 Up1 = FT1;
@@ -125,11 +124,14 @@ IL1 = (Re/dt)*speye(size(L)) - (1/2) * L;
 IL2 = (Re/dt)*speye(size(L)) + (1/2) * L;
 ILp = (Re/dt)*speye(size(Lp)) - (1/2) * Lp;
 
-
 % plot initial position of the material
 figure(1)
 plot(mod(Xl(:,1), Lsqx), Xl(:,2),'ko');
-hold on;
+hold on
+plot(XTl1(:,1), XTl1(:,2), 'ro')
+hold on
+plot(XTl2(:,1), XTl2(:,2), 'ro')
+hold on
 quiver(reshape(X,Ne,Ne), reshape(Y,Ne,Ne), reshape(u(:,1),Ne,Ne), reshape(u(:,2),Ne,Ne) );
 hold off;
 axis([0 Lsqx 0 Lsqy]);
@@ -166,7 +168,7 @@ for( i = 1:Nt )
     
     % RBC
     Xltmp = Xl;
-    Xltmp(:,1) = mod(Xl(:,1), Lsq);
+    Xltmp(:,1) = mod(Xl(:,1), Lsqx);
     [idxs, delta] = evalDeltaPhysBCs( Xltmp, Ne, hx, hy );
     Un = (hx*hy) * [dot(u1(idxs), delta, 2) dot(u2(idxs), delta, 2)];
     
@@ -182,8 +184,8 @@ for( i = 1:Nt )
     F = getLagForceRLA( Xl2, Nl, dtheta, K, Kb, Ka, DA );
     
     % spread Lagrangian force onto Eulerian grid
-    fT1 = spreadLagForcePhysBCs( FT1, XTl12, XTl12, dthetaT, Ne, hx, hy );
-    fT2 = spreadLagForcePhysBCs( FT2, XTl22, XTl22, dthetaT, Ne, hx, hy );
+    fT1 = spreadLagForcePhysBCs( FT1, XTl12, dthetaT, Ne, hx, hy );
+    fT2 = spreadLagForcePhysBCs( FT2, XTl22, dthetaT, Ne, hx, hy );
     fIB = spreadLagForcePhysBCs( F, Xl2, dtheta, Ne, hx, hy );
     ftot = fB + fIB + fT1 + fT2;
     
@@ -211,7 +213,7 @@ for( i = 1:Nt )
     
     % RBC
     Xltmp = Xl2;
-    Xltmp(:,1) = mod(Xl2(:,1), Lsq);
+    Xltmp(:,1) = mod(Xl2(:,1), Lsqx);
     [idxs, delta] = evalDeltaPhysBCs( Xltmp, Ne, hx, hy );
     u1 = uT(:,1);
     u2 = uT(:,2);
@@ -227,17 +229,20 @@ for( i = 1:Nt )
     ph = pT;
     uh = u;
     u = uT;
-  
+    
     % plot fluid velocity field and IB points
     figure(1)
     plot(mod(Xl(:,1), Lsqx), Xl(:,2),'ko');
-    hold on;
+    hold on
+    plot(XTl1(:,1), XTl1(:,2), 'ro')
+    hold on
+    plot(XTl2(:,1), XTl2(:,2), 'ro')
+    hold on
     quiver(reshape(X,Ne,Ne), reshape(Y,Ne,Ne), reshape(u(:,1),Ne,Ne), reshape(u(:,2),Ne,Ne) );
     hold off;
     axis([0 Lsqx 0 Lsqy]);
     xlabel('$x$', 'Interpreter', 'latex')
     ylabel('$y$', 'Interpreter', 'latex')
-    title(['t = ' num2str(dt * i)]);
     set(gca,'fontsize',16)
     
 end
