@@ -30,10 +30,14 @@ List of MATLAB programs:
   
    getPorousSlipV.m
 
-8. Discrete differential operators for the fluid solver:
+7. Compute the tether force for the ESL
+  
+   getLagForceTether.m
+
+9. Discrete differential operators for the fluid solver:
   
    D02DDirPer.m, D02DNeumann.m, L2DNeumannPer.m, Lu2DDirPer.m
 
-9. Helper routine:
+10. Helper routine:
   
    blktridiag.m
